@@ -24,7 +24,6 @@ class BaseTest(unittest.TestCase):
         cfg = ConfigParser.ConfigParser()
 
         cfg.add_section('general')
-        cfg.set('general', 'systems', '1')
         cfg.set('general', 'spool_dir', '/tmp')
 
         cfg.add_section('1')
