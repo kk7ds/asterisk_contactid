@@ -25,6 +25,7 @@ class BaseTest(unittest.TestCase):
 
         cfg.add_section('general')
         cfg.set('general', 'spool_dir', '/tmp')
+        cfg.set('general', 'email_from', 'Alarm System <foo@bar.com>')
 
         cfg.add_section('1')
         cfg.set('1', 'name', 'Test System')
@@ -159,9 +160,11 @@ class TestMisc(BaseTest):
         e = alarm_events.parse_event_code('1', '987618140103001_')
         with mock.patch('subprocess.Popen') as mock_p:
             alarm_events.mail_event(e)
-            mock_p.assert_called_once_with(['/usr/bin/mail', '-s',
-                                            str(e), 'junk@danplanet.com'],
-                                           stdin=subprocess.PIPE)
+            mock_p.assert_called_once_with(
+                ['/usr/bin/mail',
+                 '-S', 'from=Alarm System <foo@bar.com>',
+                 '-s', str(e), 'junk@danplanet.com'],
+                stdin=subprocess.PIPE)
             mock_p.return_value.stdin.write.assert_called_once_with(e.dump())
             mock_p.return_value.stdin.close.assert_called_once_with()
             mock_p.return_value.wait.assert_called_once_with()

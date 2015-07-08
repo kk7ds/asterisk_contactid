@@ -228,9 +228,13 @@ def mail_event(event):
     nomail = [int(x) for x in nomail]
     if event.event_code in nomail:
         return
+    fromaddr = CONFIG.get('general', 'email_from')
     dest = CONFIG.get(event.system, 'email')
-    mail = subprocess.Popen(['/usr/bin/mail', '-s', str(event), dest],
-                            stdin=subprocess.PIPE)
+    mail = subprocess.Popen(
+        ['/usr/bin/mail',
+         '-S', 'from=%s' % fromaddr,
+         '-s', str(event), dest],
+         stdin=subprocess.PIPE)
     mail.stdin.write(event.dump())
     mail.stdin.close()
     mail.wait()
