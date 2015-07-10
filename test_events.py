@@ -27,16 +27,16 @@ class BaseTest(unittest.TestCase):
         cfg.set('general', 'spool_dir', '/tmp')
         cfg.set('general', 'email_from', 'Alarm System <foo@bar.com>')
 
-        cfg.add_section('1')
-        cfg.set('1', 'name', 'Test System')
-        cfg.set('1', 'email', 'junk@danplanet.com')
-        cfg.set('1', 'nomail_events', '570,666')
-        cfg.set('1', 'zone_1', 'Front Door')
-        cfg.set('1', 'zone_2', 'Back Door')
-        cfg.set('1', 'zone_3', 'Motion')
-        cfg.set('1', 'user_1', 'Fake Master')
-        cfg.set('1', 'user_2', 'Fake User')
-        cfg.set('1', 'post_url', 'http://localhost/foo')
+        cfg.add_section('9876')
+        cfg.set('9876', 'name', 'Test System')
+        cfg.set('9876', 'email', 'junk@danplanet.com')
+        cfg.set('9876', 'nomail_events', '570,666')
+        cfg.set('9876', 'zone_1', 'Front Door')
+        cfg.set('9876', 'zone_2', 'Back Door')
+        cfg.set('9876', 'zone_3', 'Motion')
+        cfg.set('9876', 'user_1', 'Fake Master')
+        cfg.set('9876', 'user_2', 'Fake User')
+        cfg.set('9876', 'post_url', 'http://localhost/foo')
 
         cfg_mock = mock.patch.object(alarm_events, 'CONFIG', cfg)
         cfg_mock.start()
@@ -45,7 +45,7 @@ class BaseTest(unittest.TestCase):
 
 class TestEvents(BaseTest):
     def test_disarm(self):
-        e = alarm_events.parse_event_code('1', '987618140103001_')
+        e = alarm_events.parse_event_code('987618140103001_')
         self.assertEqual('System disarmed normally', e.event)
         self.assertEqual(9876, e.account)
         self.assertEqual(1, e.qualifier)
@@ -57,7 +57,7 @@ class TestEvents(BaseTest):
         self.assertEqual('Test System', e.system_name)
 
     def test_arm(self):
-        e = alarm_events.parse_event_code('1', '987618340103001_')
+        e = alarm_events.parse_event_code('987618340103001_')
         self.assertEqual('System armed normally', e.event)
         self.assertEqual(9876, e.account)
         self.assertEqual(3, e.qualifier)
@@ -68,24 +68,24 @@ class TestEvents(BaseTest):
         self.assertEqual('Front Door', e.zone)
 
     def test_quick_arm(self):
-        e = alarm_events.parse_event_code('1', '987618340103098_')
+        e = alarm_events.parse_event_code('987618340103098_')
         self.assertEqual('keypad user', e.user)
 
     def test_unknown_user(self):
-        e = alarm_events.parse_event_code('1', '987618340103031_')
+        e = alarm_events.parse_event_code('987618340103031_')
         self.assertEqual('User 31', e.user)
 
     def test_unknown_zone(self):
-        e = alarm_events.parse_event_code('1', '987618340103031_')
+        e = alarm_events.parse_event_code('987618340103031_')
         self.assertEqual('Zone 31', e.zone)
 
     def test_summary_4xx(self):
-        e = alarm_events.parse_event_code('1', '987618340103001_')
+        e = alarm_events.parse_event_code('987618340103001_')
         self.assertEqual('Event 401: System armed normally by '
                          'Fake Master at Test System', str(e))
 
     def test_summary_1xx(self):
-        e = alarm_events.parse_event_code('1', '987618113003001_')
+        e = alarm_events.parse_event_code('987618113003001_')
         self.assertEqual('Alarm 130: Burglary alarm in zone '
                          'Front Door at Test System', str(e))
 
@@ -97,9 +97,9 @@ class TestSampleConfig(unittest.TestCase):
 
 class TestUpdateState(BaseTest):
     def test_put_401_armed(self):
-        e = alarm_events.parse_event_code('1', '987618340103001_')
+        e = alarm_events.parse_event_code('987618340103001_')
         with mock.patch('urllib2.urlopen') as mock_open:
-            alarm_events.update_state('1', e)
+            alarm_events.update_state(e)
             self.assertTrue(mock_open.called)
             req = mock_open.call_args_list[0][0][0]
             self.assertEqual('http://localhost/foo/state', req.get_full_url())
@@ -107,9 +107,9 @@ class TestUpdateState(BaseTest):
             self.assertEqual('armed', req.get_data())
 
     def test_put_401_disarmed(self):
-        e = alarm_events.parse_event_code('1', '987618140103001_')
+        e = alarm_events.parse_event_code('987618140103001_')
         with mock.patch('urllib2.urlopen') as mock_open:
-            alarm_events.update_state('1', e)
+            alarm_events.update_state(e)
             self.assertTrue(mock_open.called)
             req = mock_open.call_args_list[0][0][0]
             self.assertEqual('http://localhost/foo/state', req.get_full_url())
@@ -117,9 +117,9 @@ class TestUpdateState(BaseTest):
             self.assertEqual('disarmed', req.get_data())
 
     def test_put_570_bypass(self):
-        e = alarm_events.parse_event_code('1', '987618057003001_')
+        e = alarm_events.parse_event_code('987618057003001_')
         with mock.patch('urllib2.urlopen') as mock_open:
-            alarm_events.update_state('1', e)
+            alarm_events.update_state(e)
             self.assertTrue(mock_open.called)
             req = mock_open.call_args_list[0][0][0]
             self.assertEqual('http://localhost/foo/bypass', req.get_full_url())
@@ -128,9 +128,9 @@ class TestUpdateState(BaseTest):
             self.assertEqual(1, len(mock_open.call_args_list))
 
     def test_put_570_unbypass(self):
-        e = alarm_events.parse_event_code('1', '987618357003001_')
+        e = alarm_events.parse_event_code('987618357003001_')
         with mock.patch('urllib2.urlopen') as mock_open:
-            alarm_events.update_state('1', e)
+            alarm_events.update_state(e)
             self.assertTrue(mock_open.called)
             req = mock_open.call_args_list[0][0][0]
             self.assertEqual('http://localhost/foo/bypass', req.get_full_url())
@@ -146,7 +146,8 @@ class TestMisc(BaseTest):
         self.assertEqual('987618340103001_', event)
 
     def test_mail_nomail(self):
-        e = alarm_events.Event('1')
+        e = alarm_events.Event()
+        e.account = 9876
         e.event_code = 570
         with mock.patch('subprocess.Popen') as mock_p:
             alarm_events.mail_event(e)
@@ -157,7 +158,7 @@ class TestMisc(BaseTest):
             self.assertFalse(mock_p.called)
 
     def test_mail_event(self):
-        e = alarm_events.parse_event_code('1', '987618140103001_')
+        e = alarm_events.parse_event_code('987618140103001_')
         with mock.patch('subprocess.Popen') as mock_p:
             alarm_events.mail_event(e)
             mock_p.assert_called_once_with(

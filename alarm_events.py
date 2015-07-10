@@ -82,9 +82,9 @@ def _update_state(prefix, key, value):
         req.get_method = lambda: 'POST'
         u = urllib2.urlopen(req)
 
-def update_state(system, event):
+def update_state(event):
     try:
-        prefix = CONFIG.get(system, 'post_url')
+        prefix = CONFIG.get(event.system, 'post_url')
     except ConfigParser.NoOptionError:
         return
 
@@ -111,9 +111,17 @@ def update_state(system, event):
 
 
 class Event:
-    def __init__(self, system):
-        self.system = system
-        self.system_name = CONFIG.get(self.system, 'name')
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    @property
+    def system(self):
+        return str(self.account)
+
+    @property
+    def system_name(self):
+        return CONFIG.get(self.system, 'name')
 
     @property
     def event(self):
@@ -183,7 +191,7 @@ class Event:
     def dump(self):
         keys = ['event', 'zone', 'user', 'event_code', 'zone_number',
                 'partition', 'qualifier', 'account', 'raw_event',
-                'system']
+                'system_name']
         string = ''
         for key in keys:
             string += '%s=%s\n' % (key, getattr(self, key))
@@ -212,8 +220,8 @@ def process_event_file(filename):
     return process_event(lines)
 
 
-def parse_event_code(system, event_code):
-    event = Event(system)
+def parse_event_code(event_code):
+    event = Event()
     event.account = int(event_code[0:4])
     event.qualifier = int(event_code[6])
     event.event_code = int(event_code[7:10])
@@ -240,9 +248,9 @@ def mail_event(event):
     mail.wait()
 
 
-def log_event(system, event):
+def log_event(event):
     filename = os.path.join(os.getenv('HOME', '/tmp'),
-                            '%s-security.log' % system)
+                            '%s-security.log' % event.account)
     line = '%s: %s' % (time.strftime('%Y-%m-%dT%H:%M:%S'),
                        str(event))
     with file(filename, 'a') as f:
@@ -259,12 +267,12 @@ def main():
     spool = CONFIG.get('general', 'spool_dir')
     files = glob.glob(os.path.join(spool, 'event-*'))
     for filename in files:
-        system, event_code = process_event_file(filename)
-        event = parse_event_code(system, event_code)
+        from_ext, event_code = process_event_file(filename)
+        event = parse_event_code(event_code)
 
         mail_event(event)
-        log_event(system, event)
-        update_state(system, event)
+        log_event(event)
+        update_state(event)
         os.remove(filename)
 
 
