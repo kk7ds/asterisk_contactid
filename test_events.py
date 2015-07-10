@@ -9,7 +9,7 @@ import alarm_events
 FAKE_EVENT_LINES = ['[metadata]',
                     '',
                     'CALLINGFROM=1',
-                    'CALLERNAME=Test',
+                    'CALLERNAME=Test Caller',
                     'FOO=bar',
                     '',
                     '[events]',
@@ -141,8 +141,9 @@ class TestUpdateState(BaseTest):
 
 class TestMisc(BaseTest):
     def test_process_event(self):
-        extension, event = alarm_events.process_event(FAKE_EVENT_LINES)
+        extension, name, event = alarm_events.process_event(FAKE_EVENT_LINES)
         self.assertEqual('1', extension)
+        self.assertEqual('Test Caller', name)
         self.assertEqual('987618340103001_', event)
 
     def test_mail_nomail(self):

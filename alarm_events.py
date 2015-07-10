@@ -191,27 +191,32 @@ class Event:
     def dump(self):
         keys = ['event', 'zone', 'user', 'event_code', 'zone_number',
                 'partition', 'qualifier', 'account', 'raw_event',
-                'system_name']
+                'system_name', 'from_name', 'from_ext']
         string = ''
         for key in keys:
-            string += '%s=%s\n' % (key, getattr(self, key))
+            if hasattr(self, key):
+                string += '%s=%s\n' % (key, getattr(self, key))
         return string
 
 
 def process_event(lines):
     event = None
     ext = None
+    name = None
     for line in lines:
         if not line:
             continue
         if line.startswith('CALLINGFROM'):
             _, ext = line.split('=', 1)
             ext = ext.strip()
+        if line.startswith('CALLERNAME'):
+            _, name = line.split('=', 1)
+            name = name.strip()
         if line[0].isdigit():
             event = line.strip()
             break
 
-    return ext, event
+    return ext, name, event
 
 
 def process_event_file(filename):
@@ -267,8 +272,10 @@ def main():
     spool = CONFIG.get('general', 'spool_dir')
     files = glob.glob(os.path.join(spool, 'event-*'))
     for filename in files:
-        from_ext, event_code = process_event_file(filename)
+        from_ext, from_name, event_code = process_event_file(filename)
         event = parse_event_code(event_code)
+        event.from_ext = from_ext
+        event.from_name = from_name
 
         mail_event(event)
         log_event(event)
