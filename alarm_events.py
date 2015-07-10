@@ -112,12 +112,19 @@ def update_state(event):
 
 class Event:
     def __init__(self, **kwargs):
+        self.system_format = '%(account)s'
+        self.partition = 0
+        self.from_ext = '?'
+        self.from_caller = '?'
+        self.account = 0
         for key, value in kwargs.items():
             setattr(self, key, value)
 
     @property
     def system(self):
-        return str(self.account)
+        keys = ['partition', 'from_ext', 'from_caller', 'account']
+        attrs = {k: getattr(self, k) for k in keys}
+        return self.system_format % attrs
 
     @property
     def system_name(self):
@@ -270,12 +277,18 @@ def load_config(filename):
 
 def main():
     spool = CONFIG.get('general', 'spool_dir')
+    if CONFIG.has_option('general', 'system_format'):
+        system_format = CONFIG.get('general', 'system_format', True)
+    else:
+        system_format = None
     files = glob.glob(os.path.join(spool, 'event-*'))
     for filename in files:
         from_ext, from_name, event_code = process_event_file(filename)
         event = parse_event_code(event_code)
         event.from_ext = from_ext
         event.from_name = from_name
+        if system_format:
+            event.system_format = system_format
 
         mail_event(event)
         log_event(event)

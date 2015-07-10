@@ -92,7 +92,14 @@ class TestEvents(BaseTest):
 
 class TestSampleConfig(unittest.TestCase):
     def test_load_sample_config(self):
-        alarm_events.load_config('sample.config')
+        cfg = ConfigParser.ConfigParser()
+        cfg_mock = mock.patch.object(alarm_events, 'CONFIG', cfg)
+        cfg_mock.start()
+        self.addCleanup(cfg_mock.stop)
+
+        self.assertFalse(alarm_events.CONFIG.has_section('general'))
+        alarm_events.load_config('samples/sample.config')
+        self.assertTrue(alarm_events.CONFIG.has_section('general'))
 
 
 class TestUpdateState(BaseTest):
@@ -184,3 +191,41 @@ class TestMisc(BaseTest):
         self.assertFalse(os.path.exists(fn))
         self.assertTrue(mock_urlopen.called)
         self.assertTrue(mock_popen.called)
+
+    @mock.patch('glob.glob')
+    @mock.patch('alarm_events.update_state')
+    @mock.patch('subprocess.Popen')
+    def test_main(self, mock_popen, mock_update, mock_glob):
+        alarm_events.CONFIG.set('general', 'system_format',
+                                '%(from_ext)s-%(account)s')
+        fn = '/tmp/test_event'
+        with open(fn, 'w') as f:
+            f.write('\n'.join(FAKE_EVENT_LINES))
+        mock_glob.return_value = [fn]
+
+        alarm_events.CONFIG.add_section('1-9876')
+        for k, v in alarm_events.CONFIG.items('9876'):
+            alarm_events.CONFIG.set('1-9876', k, v)
+        alarm_events.CONFIG.remove_section('9876')
+
+        alarm_events.main()
+        mock_glob.assert_called_once_with('/tmp/event-*')
+        self.assertFalse(os.path.exists(fn))
+        self.assertTrue(mock_update.called)
+        self.assertTrue(mock_popen.called)
+        event = mock_update.call_args_list[0][0][0]
+        self.assertEqual('%(from_ext)s-%(account)s', event.system_format)
+        self.assertEqual('1-9876', event.system)
+
+    def test_event_system(self):
+        e = alarm_events.Event(account=123)
+        self.assertEqual('123', e.system)
+
+    def test_event_system_format(self):
+        e = alarm_events.Event(account=123,
+                               partition=456,
+                               from_ext='foo',
+                               from_caller='bar',
+                               system_format=('%(partition)s-%(from_ext)s-'
+                                              '%(from_caller)s-%(account)s'))
+        self.assertEqual('456-foo-bar-123', e.system)
