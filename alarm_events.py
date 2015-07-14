@@ -9,6 +9,7 @@ import os
 import subprocess
 import sys
 import time
+import traceback
 import urllib2
 
 
@@ -110,6 +111,52 @@ def update_state(event):
         print 'FAILED to update state: %s' % e
 
 
+class TroubleReport(object):
+    def __init__(self, event):
+        self._event = event
+
+    def __str__(self):
+        if self._event.qualifier == 3:
+            qual = ' (restored)'
+        else:
+            qual = ''
+        return 'Trouble with expander device %i%s' % (
+            self._event.zone_number, qual)
+
+
+class NetworxTroubleReport(TroubleReport):
+    def __init__(self, event):
+        super(NetworxTroubleReport, self).__init__(event)
+        self._devices = {0: 'Control Panel'}
+        for keypad in range(0, 8):
+            for partition in range(0, 8):
+                index = 192 + (8 * keypad) + partition
+                self._devices[index] = 'Keypad %i (Partition %i)' % (
+                    keypad + 1, partition + 1)
+        expanders = [23] + range(16, 22) + range(96, 112)
+        for i, number in enumerate(expanders):
+            self._devices[number] = 'Expander %i (Zones %i-%i)' % (
+                number, 9 + i, 9 + 8 + i)
+        powers = range(84, 92)
+        for number in powers:
+            self._devices[number] = 'Power Supply %i' % number
+
+    def __str__(self):
+        if self._event.qualifier == 3:
+            qual = ' (restored)'
+        else:
+            qual = ''
+        device = self._event.zone_number
+        return 'Trouble with %s%s' % (
+            self._devices.get(device, 'expander device %i' % device),
+            qual)
+
+
+TROUBLE_REPORTERS = {
+    'networx': NetworxTroubleReport,
+}
+
+
 class Event:
     def __init__(self, **kwargs):
         self.system_format = '%(account)s'
@@ -200,6 +247,14 @@ class Event:
                 'partition', 'qualifier', 'account', 'raw_event',
                 'system_name', 'from_name', 'from_ext']
         string = ''
+        if self.event_code / 100 == 3:
+            try:
+                trouble_cls = TROUBLE_REPORTERS[CONFIG.get(self.system,
+                                                           'type')]
+            except:
+                trouble_cls = TroubleReport
+            trouble_rpt = trouble_cls(self)
+            string += 'reason=%s\n' % trouble_rpt
         for key in keys:
             if hasattr(self, key):
                 string += '%s=%s\n' % (key, getattr(self, key))
@@ -296,9 +351,27 @@ def main():
         os.remove(filename)
 
 
+def safe_main():
+    try:
+        main()
+    except Exception, e:
+        print 'Failed: %s' % e
+        sn_email = CONFIG.get('general', 'safety_net_email')
+        subject = 'Failed to process alarm event'
+        msg = ('Failed to process event:\n' +
+               traceback.format_exc())
+        mail = subprocess.Popen(
+            ['/usr/bin/mail',
+             '-s', subject, sn_email],
+            stdin=subprocess.PIPE)
+        mail.stdin.write(msg)
+        mail.stdin.close()
+        mail.wait()
+
+
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         print 'Requires config path as argument'
 
     load_config(sys.argv[1])
-    main()
+    safe_main()

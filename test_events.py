@@ -37,6 +37,7 @@ class BaseTest(unittest.TestCase):
         cfg.set('9876', 'user_1', 'Fake Master')
         cfg.set('9876', 'user_2', 'Fake User')
         cfg.set('9876', 'post_url', 'http://localhost/foo')
+        cfg.set('9876', 'type', 'networx')
 
         cfg_mock = mock.patch.object(alarm_events, 'CONFIG', cfg)
         cfg_mock.start()
@@ -88,6 +89,43 @@ class TestEvents(BaseTest):
         e = alarm_events.parse_event_code('987618113003001_')
         self.assertEqual('Alarm 130: Burglary alarm in zone '
                          'Front Door at Test System', str(e))
+
+    def test_expander_trouble(self):
+        e = alarm_events.parse_event_code('987618333300200_')
+        reason = e.dump().split('\n')[0]
+        self.assertEqual(
+            'reason=Trouble with Keypad 2 (Partition 1) (restored)',
+            reason)
+
+    def test_system_trouble(self):
+        e = alarm_events.parse_event_code('987618333300000_')
+        reason = e.dump().split('\n')[0]
+        self.assertEqual(
+            'reason=Trouble with Control Panel (restored)',
+            reason)
+
+    def test_unknown_trouble(self):
+        e = alarm_events.parse_event_code('987618333300911_')
+        reason = e.dump().split('\n')[0]
+        self.assertEqual(
+            'reason=Trouble with expander device 911 (restored)',
+            reason)
+
+    def test_trouble_no_type(self):
+        alarm_events.CONFIG.remove_option('9876', 'type')
+        e = alarm_events.parse_event_code('987618333300911_')
+        reason = e.dump().split('\n')[0]
+        self.assertEqual(
+            'reason=Trouble with expander device 911 (restored)',
+            reason)
+
+    def test_trouble_unknown_type(self):
+        alarm_events.CONFIG.set('9876', 'type', 'foomatic9000')
+        e = alarm_events.parse_event_code('987618333300911_')
+        reason = e.dump().split('\n')[0]
+        self.assertEqual(
+            'reason=Trouble with expander device 911 (restored)',
+            reason)
 
 
 class TestSampleConfig(unittest.TestCase):
@@ -208,7 +246,7 @@ class TestMisc(BaseTest):
             alarm_events.CONFIG.set('1-9876', k, v)
         alarm_events.CONFIG.remove_section('9876')
 
-        alarm_events.main()
+        alarm_events.safe_main()
         mock_glob.assert_called_once_with('/tmp/event-*')
         self.assertFalse(os.path.exists(fn))
         self.assertTrue(mock_update.called)
